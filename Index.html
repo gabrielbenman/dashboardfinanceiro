@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard Financeiro</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+
+    /* ---------------------------------------------------
+       Reset básico e fonte
+    --------------------------------------------------- */
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: #000;
+      color: #00FF00;
+      font-family: 'VT323', monospace;
+      overflow-x: hidden;
+    }
+    body {
+      padding: 1rem;
+    }
+
+    /* ---------------------------------------------------
+       Painel genérico
+    --------------------------------------------------- */
+    .panel {
+      border: 1px solid #00FF00;
+      background-color: #000;
+      position: relative;
+      padding: 1rem;
+      min-height: 180px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ---------------------------------------------------
+       Botão “X” verde no canto superior direito
+    --------------------------------------------------- */
+    .delete-btn {
+      position: absolute;
+      top: 0.25rem;
+      right: 0.5rem;
+      background: none;
+      border: none;
+      color: #00FF00;
+      font-size: 1.5rem;
+      cursor: pointer;
+      z-index: 10;
+    }
+    .delete-btn:hover {
+      color: #55FF55;
+    }
+
+    /* ---------------------------------------------------
+       Título e valores dentro do painel
+    --------------------------------------------------- */
+    .panel h2 {
+      margin: 0;
+      padding: 0;
+      font-size: 1.25rem;
+    }
+    .panel-value {
+      font-size: clamp(2rem, 4cqw, 6rem);
+      line-height: 1.1;
+      margin: auto 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      flex-grow: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      padding: 0.5rem;
+    }
+
+    /* ---------------------------------------------------
+       Formulário / labels / inputs
+    --------------------------------------------------- */
+    label {
+      display: block;
+      margin-top: 0.5rem;
+      font-size: 0.9rem;
+    }
+    input, select {
+      background-color: #000;
+      color: #00FF00;
+      border: 1px solid #00FF00;
+      padding: 0.5rem;
+      font-family: 'VT323', monospace;
+      font-size: 1rem;
+      width: 100%;
+      margin-top: 0.25rem;
+      outline: none;
+    }
+
+    /* ---------------------------------------------------
+       Botões (adicionar painel, adicionar movimentação)
+    --------------------------------------------------- */
+    .add-panel-btn, button {
+      background-color: #000;
+      color: #00FF00;
+      border: 1px solid #00FF00;
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      font-family: 'VT323', monospace;
+      font-size: 1rem;
+      margin-top: 0.5rem;
+      width: 100%;
+    }
+    .add-panel-btn:hover, button:hover {
+      background-color: #00FF00;
+      color: #000;
+    }
+
+    /* ---------------------------------------------------
+       Cores para valores negativos/positivos
+    --------------------------------------------------- */
+    .negative {
+      color: #FF0000;
+    }
+    .positive {
+      color: #00FF00;
+    }
+
+    /* ---------------------------------------------------
+       Tabela de transações
+    --------------------------------------------------- */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 0.5rem;
+    }
+    th, td {
+      padding: 0.5rem;
+      border-bottom: 1px solid #00FF00;
+      font-size: 0.9rem;
+    }
+    th {
+      text-align: left;
+    }
+    .text-right {
+      text-align: right;
+    }
+    .text-center {
+      text-align: center;
+    }
+    .delete-transaction {
+      color: #FF0000;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1.2rem;
+    }
+    .delete-transaction:hover {
+      color: #FF5555;
+    }
+
+    /* ---------------------------------------------------
+       Lista de cartões (no painel Cartão de Crédito)
+    --------------------------------------------------- */
+    .card-list {
+      margin-top: 0.5rem;
+      max-height: 8rem;
+      overflow-y: auto;
+    }
+    .card-item {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+      margin-top: 0.25rem;
+    }
+    .card-item input {
+      flex-grow: 1;
+    }
+    .card-item .card-delete {
+      background: none;
+      border: none;
+      color: #FF0000;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+    .card-item .card-delete:hover {
+      color: #FF5555;
+    }
+    .add-card-btn {
+      background: none;
+      border: none;
+      color: #00FF00;
+      font-size: 1.5rem;
+      cursor: pointer;
+      margin-left: 0.5rem;
+    }
+    .add-card-btn:hover {
+      color: #55FF55;
+    }
+    
+    /* ---------------------------------------------------
+       Layout responsivo para painéis em 4 colunas
+    --------------------------------------------------- */
+    @media (min-width: 1024px) {
+      .lg-grid-cols-4 .panel-value {
+        font-size: clamp(1.8rem, 3.5cqw, 4rem);
+      }
+    }
+    
+    /* ---------------------------------------------------
+       Ajustes para gráficos
+    --------------------------------------------------- */
+    .chart-container {
+      position: relative;
+      height: 100%;
+      width: 100%;
+      min-height: 200px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container mx-auto space-y-6">
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="panel p-4">
+        <h2 class="text-xl mb-2">LAYOUT DE PAINÉIS</h2>
+        <label for="layout-select">Escolha o número de colunas:</label>
+        <select id="layout-select">
+          <option value="4">4 colunas (em telas ≥lg)</option>
+          <option value="2" selected>2 colunas (em telas ≥md)</option>
+          <option value="1">1 coluna (em telas ≥md)</option>
+        </select>
+      </div>
+
+      <div class="panel p-4">
+        <h2 class="text-xl mb-2">ADICIONAR PAINEL</h2>
+        <label for="panel-type">Escolha o tipo de painel:</label>
+        <select id="panel-type">
+          <option value="">-- Selecionar --</option>
+          <option value="dailySpending">Gasto Diário</option>
+          <option value="monthlyCredit">Cartão de Crédito</option>
+          <option value="totalSpending">Total Gasto</option>
+          <option value="currentBalance">Saldo</option>
+          <option value="positiveBalanceTotal">Saldo Positivo Total</option>
+          <option value="positiveBalanceDaily">Saldo Positivo Diário</option>
+          <option value="comparativeBalance">Balanço Comparativo</option>
+        </select>
+        <button id="add-panel" class="add-panel-btn">➕ Adicionar Painel</button>
+      </div>
+
+      <div class="panel p-4 flex flex-col justify-center items-center">
+        <h2 class="text-xl mb-2">SALVAR/CARREGAR</h2>
+        <button id="save-html-with-data" class="w-full">💾 Salvar HTML com Dados</button>
+        <button id="reset-data" class="w-full mt-2" style="background-color: #ff0000; color: #fff; border-color: #ff0000;">♻️ Resetar Dados</button>
+      </div>
+    </div>
+
+    <div id="panels-container" class="grid grid-cols-1 gap-4">
+      <!-- Painéis padrão serão inseridos aqui via JavaScript -->
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="panel p-4">
+        <h2 class="text-xl mb-4">BALANÇO (DINHEIRO × DÍVIDAS)</h2>
+        <div class="chart-container">
+          <canvas id="balance-chart"></canvas>
+        </div>
+      </div>
+      <div class="panel p-4">
+        <h2 class="text-xl mb-4">SALDO DIÁRIO (30 DIAS)</h2>
+        <div class="chart-container">
+          <canvas id="daily-chart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel p-4">
+      <h2 class="text-xl mb-4">ADICIONAR MOVIMENTAÇÃO</h2>
+
+      <label for="transaction-type">Tipo:</label>
+      <select id="transaction-type">
+        <option value="income">RECEITA</option>
+        <option value="expense">DESPESA</option>
+      </select>
+
+      <label for="transaction-amount">Valor (R$):</label>
+      <input type="number" id="transaction-amount" placeholder="Digite o valor" />
+
+      <label for="transaction-category">Categoria:</label>
+      <select id="transaction-category">
+        <option value="salary">SALÁRIO</option>
+        <option value="transfer">TRANSFERÊNCIA</option>
+        <option value="pix">PIX</option>
+        <option value="food">ALIMENTAÇÃO</option>
+        <option value="transport">TRANSPORTE</option>
+        <option value="entertainment">LAZER</option>
+        <option value="credit">CARTÃO DE CRÉDITO</option>
+        <option value="other">OUTROS</option>
+      </select>
+
+      <label for="transaction-description">Descrição:</label>
+      <input type="text" id="transaction-description" placeholder="Digite a descrição" />
+
+      <button id="add-transaction">ADICIONAR</button>
+    </div>
+
+    <div class="panel p-4">
+      <h2 class="text-xl mb-4">ÚLTIMAS MOVIMENTAÇÕES</h2>
+      <div class="overflow-auto max-h-64">
+        <table>
+          <thead>
+            <tr>
+              <th>DATA</th>
+              <th>DESCRIÇÃO</th>
+              <th>CATEGORIA</th>
+              <th class="text-right">VALOR</th>
+              <th class="text-center">AÇÃO</th>
+            </tr>
+          </thead>
+          <tbody id="transactions-list"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---------------------------------------------------
+    // 1) Dados principais (iniciados vazios ou com dados injetados)
+    //    !! ESTE COMENTÁRIO E O CONTEÚDO ABAIXO SERÃO SUBSTITUÍDOS AO SALVAR !!
+    // ---------------------------------------------------
+    let financialData = {
+      cash: 0,
+      debts: 0,
+      dailySpending: 0,
+      monthlyCredit: 0,
+      totalSpending: 0,
+      transactions: [],
+      dailyChartData: Array(30).fill(0)
+    };
+    let creditCards = [];
+    let savedLayout = '2'; // Default layout
+    let savedPanels = ['currentBalance', 'dailySpending', 'totalSpending', 'monthlyCredit'];
+
+    // Placeholder para os dados injetados ao salvar. Não altere esta linha manualmente.
+    const INJECTED_DATA_PLACEHOLDER = null;
+    // FIM DO PLACEHOLDER
+
+    if (INJECTED_DATA_PLACEHOLDER) {
+      try {
+        const loadedData = INJECTED_DATA_PLACEHOLDER;
+        financialData = loadedData.financialData || financialData;
+        creditCards = loadedData.creditCards || creditCards;
+        savedLayout = loadedData.layout || savedLayout;
+        savedPanels = loadedData.panels || savedPanels;
+        console.log('Dados carregados do HTML embutido.');
+      } catch (e) {
+        console.error('Erro ao carregar dados do HTML embutido:', e);
+      }
+    }
+
+    // ---------------------------------------------------
+    // 2) Helper: formata valor em R$
+    // ---------------------------------------------------
+    function formatCurrency(value) {
+      return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    // ---------------------------------------------------
+    // 3) Configurar Chart.js (gráficos)
+    // ---------------------------------------------------
+    const balanceCtx = document.getElementById('balance-chart').getContext('2d');
+    const dailyCtx    = document.getElementById('daily-chart').getContext('2d');
+
+    let balanceChart = new Chart(balanceCtx, {
+      type: 'bar',
+      data: {
+        labels: ['DINHEIRO', 'DÍVIDAS'],
+        datasets: [{
+          data: [0, 0],
+          backgroundColor: ['#00FF00', '#FF0000'],
+          borderColor: ['#00FF00', '#FF0000'],
+          borderWidth: 1
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(0,255,0,0.1)' },
+            ticks: { color: '#00FF00' }
+          },
+          x: {
+            grid: { display: false },
+            ticks: { color: '#00FF00' }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            titleColor: '#00FF00',
+            bodyColor: '#00FF00'
+          }
+        }
+      }
+    });
+
+    let dailyChart = new Chart(dailyCtx, {
+      type: 'line',
+      data: {
+        labels: Array.from({ length: 30 }, (_, i) => i + 1),
+        datasets: [{
+          label: 'Saldo Diário',
+          data: financialData.dailyChartData,
+          borderColor: '#00FF00',
+          backgroundColor: 'rgba(0,0,0,0)',
+          borderWidth: 2,
+          tension: 0.1,
+          pointBackgroundColor: '#00FF00',
+          pointRadius: 3
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        scales: {
+          y: {
+            grid: { color: 'rgba(0,255,0,0.1)' },
+            ticks: { color: '#00FF00' }
+          },
+          x: {
+            grid: { color: 'rgba(0,255,0,0.1)' },
+            ticks: { color: '#00FF00' }
+          }
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            titleColor: '#00FF00',
+            bodyColor: '#00FF00'
+          }
+        }
+      }
+    });
+
+    // ---------------------------------------------------
+    // 4) Função updateUI → atualiza painéis, gráficos e tabela
+    // ---------------------------------------------------
+    function updateUI() {
+      // 4a) Atualiza valor de cada painel
+      const container = document.getElementById('panels-container');
+      const panels = container.children;
+      for (let i = 0; i < panels.length; i++) {
+        const panel = panels[i];
+        const key = panel.getAttribute('data-key');
+        let valueText = 'R$ 0,00';
+
+        switch (key) {
+          case 'dailySpending':
+            valueText = formatCurrency(financialData.dailySpending);
+            break;
+          case 'monthlyCredit':
+            valueText = formatCurrency(financialData.monthlyCredit);
+            break;
+          case 'totalSpending':
+            valueText = formatCurrency(financialData.totalSpending);
+            break;
+          case 'currentBalance':
+            const saldo = financialData.cash - financialData.debts;
+            valueText = formatCurrency(saldo);
+            const valueDivCB = panel.querySelector('.panel-value');
+            if (valueDivCB) {
+              valueDivCB.classList.remove('positive', 'negative');
+              valueDivCB.classList.add(saldo >= 0 ? 'positive' : 'negative');
+            }
+            break;
+          case 'positiveBalanceTotal':
+            const totalSaldo = financialData.cash - financialData.debts;
+            valueText = totalSaldo > 0 ? formatCurrency(totalSaldo) : formatCurrency(0);
+            break;
+          case 'positiveBalanceDaily':
+            const gasto = financialData.dailySpending;
+            valueText = gasto > 0 ? formatCurrency(gasto) : formatCurrency(0);
+            break;
+          case 'comparativeBalance':
+            // este campo é tratado um pouco abaixo em 4f
+            break;
+          default:
+            valueText = 'R$ 0,00';
+        }
+
+        const valueDiv = panel.querySelector('.panel-value');
+        if (valueDiv && key !== 'currentBalance' && key !== 'comparativeBalance') {
+          valueDiv.innerText = valueText;
+        }
+      }
+
+      // 4b) Atualiza o gráfico DINHEIRO × DÍVIDAS
+      balanceChart.data.datasets[0].data = [financialData.cash, financialData.debts];
+      balanceChart.update();
+
+      // 4c) Atualiza o gráfico SALDO DIÁRIO (30 dias)
+      while (financialData.dailyChartData.length < 30) {
+        financialData.dailyChartData.unshift(0);
+      }
+      while (financialData.dailyChartData.length > 30) {
+        financialData.dailyChartData.shift();
+      }
+      dailyChart.data.datasets[0].data = financialData.dailyChartData;
+      dailyChart.update();
+
+      // 4d) Atualiza tabela de últimas movimentações (até 10 linhas)
+      const tbody = document.getElementById('transactions-list');
+      tbody.innerHTML = '';
+      financialData.transactions.slice(0, 10).forEach((tr, index) => {
+        const tipoClasse = tr.type === 'income' ? 'positive' : 'negative';
+        const sinal = tr.type === 'income' ? '+' : '-';
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td>${tr.date}</td>
+          <td>${tr.description}</td>
+          <td>${tr.category}</td>
+          <td class="text-right ${tipoClasse}">${sinal}${formatCurrency(tr.amount)}</td>
+          <td class="text-center">
+            <button class="delete-transaction" data-index="${index}" title="Excluir movimentação">✖</button>
+          </td>
+        `;
+        tbody.appendChild(row);
+      });
+      document.querySelectorAll('.delete-transaction').forEach(button => {
+        button.addEventListener('click', function() {
+          const index = parseInt(this.getAttribute('data-index'));
+          deleteTransaction(index);
+        });
+      });
+
+      // 4e) Atualiza lista de cartões (se presente)
+      if (document.querySelector('[data-key="monthlyCredit"]')) {
+        atualizarListaDeCartoes();
+      }
+
+      // 4f) Atualiza o painel de BALANÇO COMPARATIVO (se existir)
+      const comp = document.querySelector('[data-key="comparativeBalance"] .panel-value');
+      if (comp) {
+        const result = financialData.cash - financialData.debts;
+        comp.innerText = formatCurrency(result);
+        comp.classList.remove('positive', 'negative');
+        comp.classList.add(result >= 0 ? 'positive' : 'negative');
+      }
+    }
+
+    // ---------------------------------------------------
+    // 5) Função para excluir uma transação
+    // ---------------------------------------------------
+    function deleteTransaction(index) {
+      if (index < 0 || index >= financialData.transactions.length) return;
+      const transaction = financialData.transactions[index];
+      if (transaction.type === 'income') {
+        financialData.cash -= transaction.amount;
+      } else {
+        financialData.totalSpending -= transaction.amount;
+        if (transaction.category === 'CARTÃO DE CRÉDITO') {
+          financialData.monthlyCredit -= transaction.amount;
+          financialData.debts -= transaction.amount;
+        } else {
+          financialData.cash += transaction.amount;
+          financialData.dailySpending -= transaction.amount;
+        }
+      }
+      // Ajusta último ponto do gráfico
+      financialData.dailyChartData[financialData.dailyChartData.length - 1] = financialData.cash - financialData.debts;
+      financialData.transactions.splice(index, 1);
+      updateUI();
+    }
+
+    // ---------------------------------------------------
+    // 6) “ADICIONAR MOVIMENTAÇÃO” → Lógica de receita/despesa
+    // ---------------------------------------------------
+    document.getElementById('add-transaction').addEventListener('click', function () {
+      const type = document.getElementById('transaction-type').value;
+      const amount = parseFloat(document.getElementById('transaction-amount').value);
+      const categoryValue = document.getElementById('transaction-category').value;
+      const description = document.getElementById('transaction-description').value || 'SEM DESCRIÇÃO';
+      const dateStr = new Date().toLocaleDateString('pt-BR');
+
+      if (isNaN(amount) || amount <= 0) {
+        return alert('Digite um valor válido acima de zero.');
+      }
+
+      const categoryTextMap = {
+        salary: 'SALÁRIO',
+        transfer: 'TRANSFERÊNCIA',
+        pix: 'PIX',
+        food: 'ALIMENTAÇÃO',
+        transport: 'TRANSPORTE',
+        entertainment: 'LAZER',
+        credit: 'CARTÃO DE CRÉDITO',
+        other: 'OUTROS'
+      };
+      const categoryName = categoryTextMap[categoryValue] || 'OUTROS';
+
+      const transaction = { date: dateStr, description, category: categoryName, amount, type };
+      financialData.transactions.unshift(transaction);
+
+      if (type === 'income') {
+        financialData.cash += amount;
+      } else {
+        financialData.totalSpending += amount;
+        if (categoryValue === 'credit') {
+          financialData.monthlyCredit += amount;
+          financialData.debts += amount;
+        } else {
+          financialData.cash -= amount;
+          financialData.dailySpending += amount;
+        }
+      }
+
+      // Adiciona saldo atual ao gráfico
+      const currentBalance = financialData.cash - financialData.debts;
+      if (financialData.dailyChartData.length >= 30) {
+        financialData.dailyChartData.shift();
+      }
+      financialData.dailyChartData.push(currentBalance);
+
+      updateUI();
+      document.getElementById('transaction-amount').value = '';
+      document.getElementById('transaction-description').value = '';
+    });
+
+    // ---------------------------------------------------
+    // 7) Atualiza lista de cartões no painel “Cartão de Crédito”
+    // ---------------------------------------------------
+    function atualizarListaDeCartoes() {
+      const container = document.getElementById('panels-container');
+      const panel = container.querySelector('[data-key="monthlyCredit"]');
+      if (!panel) return;
+      const listContainer = panel.querySelector('.card-list');
+      listContainer.innerHTML = '';
+
+      creditCards.forEach((texto, idx) => {
+        const div = document.createElement('div');
+        div.className = 'card-item';
+
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = texto;
+        input.style.backgroundColor = '#000';
+        input.style.color = '#00FF00';
+        input.style.border = '1px solid #00FF00';
+        input.onchange = () => {
+          creditCards[idx] = input.value;
+        };
+        div.appendChild(input);
+
+        const delBtn = document.createElement('button');
+        delBtn.className = 'card-delete';
+        delBtn.textContent = '✖';
+        delBtn.onclick = () => {
+          creditCards.splice(idx, 1);
+          atualizarListaDeCartoes();
+        };
+        div.appendChild(delBtn);
+
+        listContainer.appendChild(div);
+      });
+    }
+
+    // ---------------------------------------------------
+    // 8) Função createPanel(key) → cria painel dinamicamente
+    // ---------------------------------------------------
+    function createPanel(key) {
+      const titleMap = {
+        dailySpending: 'GASTO DIÁRIO',
+        monthlyCredit: 'CARTÃO DE CRÉDITO',
+        totalSpending: 'TOTAL GASTO',
+        currentBalance: 'SALDO',
+        positiveBalanceTotal: 'SALDO POSITIVO TOTAL',
+        positiveBalanceDaily: 'SALDO POSITIVO DIÁRIO',
+        comparativeBalance: 'BALANÇO COMPARATIVO'
+      };
+      const title = titleMap[key] || 'PAINEL';
+
+      const panel = document.createElement('div');
+      panel.className = 'panel p-4';
+      panel.setAttribute('data-key', key);
+      panel.setAttribute('draggable', 'true');
+
+      const deleteBtn = document.createElement('button');
+      deleteBtn.className = 'delete-btn';
+      deleteBtn.title = 'Excluir Painel';
+      deleteBtn.textContent = '✖';
+      panel.appendChild(deleteBtn);
+
+      const h2 = document.createElement('h2');
+      h2.className = 'text-xl';
+      h2.textContent = title;
+      panel.appendChild(h2);
+
+      // Se for painel “comparativeBalance”, a <div class="panel-value"> já recebe logo o texto formatado dinamicamente
+      const valueDiv = document.createElement('div');
+      valueDiv.className = 'panel-value';
+      valueDiv.innerText = key === 'comparativeBalance'
+                        ? formatCurrency(financialData.cash - financialData.debts)
+                        : 'R$ 0,00';
+      panel.appendChild(valueDiv);
+
+      // Caso seja “Cartão de Crédito”, adiciona o campo para lista de cartões
+      if (key === 'monthlyCredit') {
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.alignItems = 'center';
+        row.style.gap = '0.5rem';
+        row.style.marginTop = '0.5rem';
+
+        const inputCard = document.createElement('input');
+        inputCard.type = 'text';
+        inputCard.placeholder = 'Banco - Dia';
+        inputCard.style.backgroundColor = '#000';
+        inputCard.style.color = '#00FF00';
+        inputCard.style.border = '1px solid #00FF00';
+        inputCard.className = 'flex-grow';
+        row.appendChild(inputCard);
+
+        const addBtn = document.createElement('button');
+        addBtn.className = 'add-card-btn';
+        addBtn.textContent = '+';
+        addBtn.title = 'Adicionar Cartão';
+        addBtn.onclick = () => {
+          const texto = inputCard.value.trim();
+          if (texto) {
+            creditCards.push(texto);
+            inputCard.value = '';
+            atualizarListaDeCartoes();
+          }
+        };
+        row.appendChild(addBtn);
+
+        panel.appendChild(row);
+
+        const listDiv = document.createElement('div');
+        listDiv.className = 'card-list';
+        panel.appendChild(listDiv);
+      }
+
+      return panel;
+    }
+
+    // ---------------------------------------------------
+    // 9) “Adicionar Painel” a partir do dropdown
+    // ---------------------------------------------------
+    document.getElementById('add-panel').addEventListener('click', function() {
+      const select = document.getElementById('panel-type');
+      const key = select.value;
+      if (!key) return;
+
+      if (document.querySelector(`[data-key="${key}"]`)) {
+        alert('Este painel já existe.');
+        return;
+      }
+
+      const newPanel = createPanel(key);
+      document.getElementById('panels-container').appendChild(newPanel);
+
+      addDragAndDropHandlers();
+      addDeleteHandlers();
+      updateUI();
+    });
+
+    // ---------------------------------------------------
+    // 10) Mudar “layout” de painéis (1, 2 ou 4 colunas)
+    // ---------------------------------------------------
+    document.getElementById('layout-select').addEventListener('change', function() {
+      const cols = this.value; // '1', '2' ou '4'
+      const container = document.getElementById('panels-container');
+
+      container.classList.remove('md:grid-cols-1', 'md:grid-cols-2', 'md:grid-cols-4', 'lg:grid-cols-4');
+
+      if (cols === '1') {
+        container.classList.add('grid-cols-1', 'md:grid-cols-1');
+      } else if (cols === '2') {
+        container.classList.add('grid-cols-1', 'md:grid-cols-2');
+      } else if (cols === '4') {
+        container.classList.add('grid-cols-1', 'md:grid-cols-2', 'lg:grid-cols-4');
+      }
+    });
+
+    // ---------------------------------------------------
+    // 11) Funções Drag & Drop para rearranjar painéis
+    // ---------------------------------------------------
+    let dragSrcIndex = null;
+
+    function handleDragStart(e) {
+      dragSrcIndex = Number(this.getAttribute('data-index'));
+      this.style.opacity = '0.5';
+      e.dataTransfer.effectAllowed = 'move';
+    }
+
+    function handleDragEnd(e) {
+      this.style.opacity = '1';
+    }
+
+    function handleDragOver(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      return false;
+    }
+
+    function handleDrop(e) {
+      e.stopPropagation();
+      const dragTargetIndex = Number(this.getAttribute('data-index'));
+      if (dragSrcIndex === null || dragSrcIndex === dragTargetIndex) return false;
+
+      const container = document.getElementById('panels-container');
+      const panels = container.children;
+
+      const srcInner = panels[dragSrcIndex].innerHTML;
+      const dstInner = panels[dragTargetIndex].innerHTML;
+      panels[dragSrcIndex].innerHTML = dstInner;
+      panels[dragTargetIndex].innerHTML = srcInner;
+
+      const srcKey = panels[dragTargetIndex].getAttribute('data-key');
+      const dstKey = panels[dragSrcIndex].getAttribute('data-key');
+      panels[dragSrcIndex].setAttribute('data-key', srcKey);
+      panels[dragTargetIndex].setAttribute('data-key', dstKey);
+
+      addDragAndDropHandlers();
+      addDeleteHandlers();
+      updateUI();
+      dragSrcIndex = null;
+      return false;
+    }
+
+    function addDragAndDropHandlers() {
+      const container = document.getElementById('panels-container');
+      const panels = container.children;
+      for (let i = 0; i < panels.length; i++) {
+        const panel = panels[i];
+        panel.setAttribute('data-index', i.toString());
+        panel.setAttribute('draggable', 'true');
+
+        panel.removeEventListener('dragstart', handleDragStart);
+        panel.removeEventListener('dragend', handleDragEnd);
+        panel.removeEventListener('dragover', handleDragOver);
+        panel.removeEventListener('drop', handleDrop);
+
+        panel.addEventListener('dragstart', handleDragStart, false);
+        panel.addEventListener('dragend', handleDragEnd, false);
+        panel.addEventListener('dragover', handleDragOver, false);
+        panel.addEventListener('drop', handleDrop, false);
+      }
+    }
+
+    // ---------------------------------------------------
+    // 12) Excluir painel (botão “✖” verde)
+    // ---------------------------------------------------
+    function addDeleteHandlers() {
+      const deleteButtons = document.querySelectorAll('.delete-btn');
+      deleteButtons.forEach(btn => {
+        btn.removeEventListener('click', handleDelete);
+        btn.addEventListener('click', handleDelete, false);
+      });
+    }
+
+    function handleDelete(e) {
+      e.stopPropagation();
+      const panel = this.parentElement;
+      panel.remove();
+      addDragAndDropHandlers();
+      addDeleteHandlers();
+    }
+
+    // ---------------------------------------------------
+    // 13) Função para Salvar o HTML com os dados atuais
+    // ---------------------------------------------------
+    function saveHtmlWithData() {
+      const dataToInject = {
+        financialData: financialData,
+        creditCards: creditCards,
+        layout: document.getElementById('layout-select').value,
+        panels: Array.from(document.querySelectorAll('#panels-container > .panel')).map(
+          p => p.getAttribute('data-key')
+        )
+      };
+
+      const originalHtml = document.documentElement.outerHTML;
+      const injectedDataJson = JSON.stringify(dataToInject, null, 2);
+
+      const modifiedHtml = originalHtml.replace(
+        `const INJECTED_DATA_PLACEHOLDER = null;`,
+        `const INJECTED_DATA_PLACEHOLDER = ${injectedDataJson};`
+      );
+
+      const blob = new Blob([modifiedHtml], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'dashboard_com_dados.html';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // ---------------------------------------------------
+    // 14) Função para resetar todos os dados e painéis
+    // ---------------------------------------------------
+    function resetAllData() {
+      if (!confirm('Tem certeza que deseja resetar todos os dados e painéis? Esta ação não pode ser desfeita.')) {
+        return;
+      }
+      financialData = {
+        cash: 0,
+        debts: 0,
+        dailySpending: 0,
+        monthlyCredit: 0,
+        totalSpending: 0,
+        transactions: [],
+        dailyChartData: Array(30).fill(0)
+      };
+      creditCards = [];
+
+      const panelsContainer = document.getElementById('panels-container');
+      panelsContainer.innerHTML = '';
+
+      const defaultPanels = ['currentBalance', 'dailySpending', 'totalSpending', 'monthlyCredit'];
+      defaultPanels.forEach(panelKey => {
+        const newPanel = createPanel(panelKey);
+        panelsContainer.appendChild(newPanel);
+      });
+      document.getElementById('layout-select').value = '2';
+      document.getElementById('layout-select').dispatchEvent(new Event('change'));
+
+      updateUI();
+      addDragAndDropHandlers();
+      addDeleteHandlers();
+      alert('Dados e painéis resetados para o estado inicial!');
+    }
+
+    // ---------------------------------------------------
+    // 15) Inicialização quando a página carrega
+    // ---------------------------------------------------
+    window.addEventListener('load', function() {
+      if (!INJECTED_DATA_PLACEHOLDER) {
+        document.getElementById('layout-select').value = savedLayout;
+        document.getElementById('layout-select').dispatchEvent(new Event('change'));
+
+        const panelsContainer = document.getElementById('panels-container');
+        panelsContainer.innerHTML = '';
+        savedPanels.forEach(panelKey => {
+          const newPanel = createPanel(panelKey);
+          panelsContainer.appendChild(newPanel);
+        });
+      }
+
+      updateUI();
+      addDragAndDropHandlers();
+      addDeleteHandlers();
+
+      document.getElementById('save-html-with-data').addEventListener('click', saveHtmlWithData);
+      document.getElementById('reset-data').addEventListener('click', resetAllData);
+    });
+  </script>
+</body>
+</html>
