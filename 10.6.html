@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Dashboard Financeiro Prospectivo</title>
+
+  <!-- Tailwind CSS para estilos rápidos -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js para gráficos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=VT323&display=swap');
+    
+    :root {
+      --primary-color: #00FF00;
+      --background-color: #000;
+      --negative-color: #FF0000;
+      --panel-border: 1px solid var(--primary-color);
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      background-color: var(--background-color);
+      color: var(--primary-color);
+      font-family: 'VT323', monospace;
+      padding: 1rem;
+      min-height: 100vh;
+    }
+    
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+    
+    .dashboard-grid {
+      display: grid;
+      gap: 1.5rem;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    }
+    
+    .panel {
+      border: var(--panel-border);
+      background-color: var(--background-color);
+      position: relative;
+      padding: 1.5rem;
+      border-radius: 4px;
+      box-shadow: 0 0 10px rgba(0, 255, 0, 0.1);
+    }
+    
+    .panel-header {
+      font-size: 1.5rem;
+      margin-bottom: 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    
+    .panel-value {
+      font-size: clamp(2rem, 5vw, 4rem);
+      text-align: center;
+      margin: 1rem 0;
+    }
+    
+    .positive {
+      color: var(--primary-color);
+    }
+    
+    .negative {
+      color: var(--negative-color);
+    }
+    
+    .chart-container {
+      height: 300px;
+      position: relative;
+    }
+    
+    .btn {
+      background-color: var(--background-color);
+      color: var(--primary-color);
+      border: var(--panel-border);
+      padding: 0.5rem 1rem;
+      cursor: pointer;
+      font-family: 'VT323', monospace;
+      font-size: 1.2rem;
+      transition: all 0.3s ease;
+    }
+    
+    .btn:hover {
+      background-color: var(--primary-color);
+      color: var(--background-color);
+    }
+    
+    .form-group {
+      margin-bottom: 1rem;
+    }
+    
+    label {
+      display: block;
+      margin-bottom: 0.25rem;
+      font-size: 1.1rem;
+    }
+    
+    input, select {
+      width: 100%;
+      padding: 0.75rem;
+      background-color: var(--background-color);
+      color: var(--primary-color);
+      border: var(--panel-border);
+      font-family: 'VT323', monospace;
+      font-size: 1.2rem;
+    }
+    
+    .transaction-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 1rem;
+    }
+    
+    .transaction-table th, 
+    .transaction-table td {
+      padding: 0.75rem;
+      border-bottom: var(--panel-border);
+      text-align: left;
+    }
+    
+    .transaction-table th {
+      font-size: 1.1rem;
+    }
+    
+    .text-right {
+      text-align: right;
+    }
+    
+    .delete-btn {
+      background: none;
+      border: none;
+      color: var(--negative-color);
+      cursor: pointer;
+      font-size: 1.2rem;
+    }
+    
+    .delete-btn:hover {
+      color: #ff5555;
+    }
+    
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    
+    @media (max-width: 768px) {
+      .controls {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1 class="text-center text-3xl mb-6">DASHBOARD FINANCEIRO PROSPECTIVO</h1>
+    
+    <div class="controls">
+      <div class="panel">
+        <h2 class="panel-header">LAYOUT DE PAINÉIS</h2>
+        <div class="form-group">
+          <label for="layout-select">Colunas:</label>
+          <select id="layout-select" class="w-full">
+            <option value="4">4 colunas</option>
+            <option value="3">3 colunas</option>
+            <option value="2" selected>2 colunas</option>
+            <option value="1">1 coluna</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="panel">
+        <h2 class="panel-header">ADICIONAR PAINEL</h2>
+        <div class="form-group">
+          <label for="panel-type">Tipo de painel:</label>
+          <select id="panel-type" class="w-full">
+            <option value="">-- Selecionar --</option>
+            <option value="dailySpending">Gasto Diário</option>
+            <option value="monthlyCredit">Cartão de Crédito</option>
+            <option value="totalSpending">Total Gasto</option>
+            <option value="currentBalance">Saldo</option>
+          </select>
+        </div>
+        <button id="add-panel" class="btn w-full">➕ Adicionar Painel</button>
+      </div>
+    </div>
+    
+    <div id="panels-container" class="dashboard-grid">
+      <!-- Painéis serão adicionados aqui -->
+    </div>
+    
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+      <div class="panel">
+        <h2 class="panel-header">BALANÇO (DINHEIRO × DÍVIDAS)</h2>
+        <div class="chart-container">
+          <canvas id="balance-chart"></canvas>
+        </div>
+      </div>
+      
+      <div class="panel">
+        <h2 class="panel-header">SALDO DIÁRIO (PRÓXIMOS 30 DIAS)</h2>
+        <div class="chart-container">
+          <canvas id="daily-chart"></canvas>
+        </div>
+      </div>
+    </div>
+    
+    <div class="panel mt-6">
+      <h2 class="panel-header">ADICIONAR MOVIMENTAÇÃO</h2>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="form-group">
+          <label for="transaction-type">Tipo:</label>
+          <select id="transaction-type" class="w-full">
+            <option value="income">RECEITA</option>
+            <option value="expense">DESPESA</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="transaction-amount">Valor (R$):</label>
+          <input type="number" id="transaction-amount" placeholder="Digite o valor" class="w-full">
+        </div>
+        
+        <div class="form-group">
+          <label for="transaction-category">Categoria:</label>
+          <select id="transaction-category" class="w-full">
+            <option value="salary">SALÁRIO</option>
+            <option value="transfer">TRANSFERÊNCIA</option>
+            <option value="pix">PIX</option>
+            <option value="food">ALIMENTAÇÃO</option>
+            <option value="transport">TRANSPORTE</option>
+            <option value="entertainment">LAZER</option>
+            <option value="credit">CARTÃO DE CRÉDITO</option>
+            <option value="other">OUTROS</option>
+          </select>
+        </div>
+        
+        <div class="form-group">
+          <label for="transaction-description">Descrição:</label>
+          <input type="text" id="transaction-description" placeholder="Digite a descrição" class="w-full">
+        </div>
+      </div>
+      <button id="add-transaction" class="btn w-full mt-4">ADICIONAR MOVIMENTAÇÃO</button>
+    </div>
+    
+    <div class="panel mt-6">
+      <h2 class="panel-header">ÚLTIMAS MOVIMENTAÇÕES</h2>
+      <div class="overflow-x-auto">
+        <table class="transaction-table">
+          <thead>
+            <tr>
+              <th>DATA</th>
+              <th>DESCRIÇÃO</th>
+              <th>CATEGORIA</th>
+              <th class="text-right">VALOR</th>
+              <th>AÇÃO</th>
+            </tr>
+          </thead>
+          <tbody id="transactions-list">
+            <!-- Transações serão adicionadas aqui -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Dados financeiros
+    let financialData = {
+      cash: 3500,
+      debts: 1250,
+      dailySpending: 85,
+      monthlyCredit: 450,
+      totalSpending: 1200,
+      transactions: [
+        { date: "02/06/2025", description: "Salário", category: "SALÁRIO", amount: 3500, type: "income" },
+        { date: "02/06/2025", description: "Aluguel", category: "OUTROS", amount: 1200, type: "expense" },
+        { date: "01/06/2025", description: "Mercado", category: "ALIMENTAÇÃO", amount: 250, type: "expense" },
+        { date: "01/06/2025", description: "Transporte", category: "TRANSPORTE", amount: 85, type: "expense" }
+      ]
+    };
+    
+    // Formatar valores monetários
+    function formatCurrency(value) {
+      return value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+    
+    // Gerar datas para os próximos 30 dias
+    function generateNext30Days() {
+      const dates = [];
+      const today = new Date();
+      
+      for (let i = 0; i < 30; i++) {
+        const date = new Date();
+        date.setDate(today.getDate() + i);
+        const day = date.getDate().toString().padStart(2, '0');
+        const month = (date.getMonth() + 1).toString().padStart(2, '0');
+        dates.push(`${day}/${month}`);
+      }
+      
+      return dates;
+    }
+    
+    // Gerar dados fictícios para o gráfico prospectivo
+    function generateProjectedData() {
+      const data = [];
+      let currentValue = financialData.cash - financialData.debts;
+      
+      for (let i = 0; i < 30; i++) {
+        // Simular variação diária aleatória
+        const dailyChange = (Math.random() - 0.5) * 200;
+        currentValue += dailyChange;
+        
+        // Garantir que valores negativos sejam mostrados
+        if (currentValue < 0) currentValue = -Math.abs(currentValue);
+        
+        data.push(currentValue);
+      }
+      
+      return data;
+    }
+    
+    // Configurar gráficos
+    function initCharts() {
+      // Gráfico de barras para dinheiro vs dívidas
+      const balanceCtx = document.getElementById('balance-chart').getContext('2d');
+      const balanceChart = new Chart(balanceCtx, {
+        type: 'bar',
+        data: {
+          labels: ['DINHEIRO', 'DÍVIDAS'],
+          datasets: [{
+            data: [financialData.cash, financialData.debts],
+            backgroundColor: ['#00FF00', '#FF0000'],
+            borderColor: ['#000', '#000'],
+            borderWidth: 1
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              beginAtZero: true,
+              grid: { color: 'rgba(0,255,0,0.1)' },
+              ticks: { color: '#00FF00', font: { size: 14 } }
+            },
+            x: {
+              grid: { display: false },
+              ticks: { color: '#00FF00', font: { size: 16, weight: 'bold' } }
+            }
+          },
+          plugins: { legend: { display: false } }
+        }
+      });
+      
+      // Gráfico de linha para saldo diário prospectivo
+      const dailyCtx = document.getElementById('daily-chart').getContext('2d');
+      const dailyChart = new Chart(dailyCtx, {
+        type: 'line',
+        data: {
+          labels: generateNext30Days(),
+          datasets: [{
+            label: 'Saldo Diário',
+            data: generateProjectedData(),
+            borderColor: '#00FF00',
+            backgroundColor: 'rgba(0,0,0,0)',
+            borderWidth: 3,
+            tension: 0.2,
+            pointBackgroundColor: '#00FF00',
+            pointRadius: 4,
+            pointHoverRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: {
+            y: {
+              grid: { color: 'rgba(0,255,0,0.1)' },
+              ticks: { color: '#00FF00', font: { size: 14 } }
+            },
+            x: {
+              grid: { color: 'rgba(0,255,0,0.1)' },
+              ticks: { color: '#00FF00', font: { size: 12 } }
+            }
+          },
+          plugins: { 
+            legend: { display: false },
+            tooltip: {
+              titleFont: { size: 16 },
+              bodyFont: { size: 14 },
+              callbacks: {
+                label: function(context) {
+                  return `Saldo: ${formatCurrency(context.parsed.y)}`;
+                }
+              }
+            }
+          }
+        }
+      });
+      
+      return { balanceChart, dailyChart };
+    }
+    
+    // Atualizar a interface
+    function updateUI() {
+      // Atualizar painéis
+      const panels = document.querySelectorAll('#panels-container .panel');
+      panels.forEach(panel => {
+        const key = panel.dataset.key;
+        let value;
+        
+        switch(key) {
+          case 'dailySpending':
+            value = financialData.dailySpending;
+            panel.querySelector('.panel-value').textContent = formatCurrency(value);
+            break;
+          case 'monthlyCredit':
+            value = financialData.monthlyCredit;
+            panel.querySelector('.panel-value').textContent = formatCurrency(value);
+            break;
+          case 'totalSpending':
+            value = financialData.totalSpending;
+            panel.querySelector('.panel-value').textContent = formatCurrency(value);
+            break;
+          case 'currentBalance':
+            value = financialData.cash - financialData.debts;
+            const valueElement = panel.querySelector('.panel-value');
+            valueElement.textContent = formatCurrency(value);
+            valueElement.className = value >= 0 ? 'panel-value positive' : 'panel-value negative';
+            break;
+        }
+      });
+      
+      // Atualizar lista de transações
+      const tbody = document.getElementById('transactions-list');
+      tbody.innerHTML = '';
+      
+      financialData.transactions.forEach((transaction, index) => {
+        const row = document.createElement('tr');
+        const typeClass = transaction.type === 'income' ? 'positive' : 'negative';
+        const sign = transaction.type === 'income' ? '+' : '-';
+        
+        row.innerHTML = `
+          <td>${transaction.date}</td>
+          <td>${transaction.description}</td>
+          <td>${transaction.category}</td>
+          <td class="text-right ${typeClass}">${sign}${formatCurrency(transaction.amount)}</td>
+          <td class="text-center">
+            <button class="delete-btn" data-index="${index}">✖</button>
+          </td>
+        `;
+        
+        tbody.appendChild(row);
+      });
+      
+      // Adicionar event listeners para botões de exclusão
+      document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+          const index = parseInt(this.dataset.index);
+          deleteTransaction(index);
+        });
+      });
+    }
+    
+    // Excluir uma transação
+    function deleteTransaction(index) {
+      if (index >= 0 && index < financialData.transactions.length) {
+        const transaction = financialData.transactions[index];
+        
+        // Reverter o efeito da transação
+        if (transaction.type === 'income') {
+          financialData.cash -= transaction.amount;
+        } else {
+          financialData.totalSpending -= transaction.amount;
+          if (transaction.category === 'CARTÃO DE CRÉDITO') {
+            financialData.monthlyCredit -= transaction.amount;
+            financialData.debts -= transaction.amount;
+          } else {
+            financialData.cash += transaction.amount;
+            financialData.dailySpending -= transaction.amount;
+          }
+        }
+        
+        // Remover a transação
+        financialData.transactions.splice(index, 1);
+        updateUI();
+        initCharts(); // Atualizar gráficos
+      }
+    }
+    
+    // Adicionar nova transação
+    document.getElementById('add-transaction').addEventListener('click', function() {
+      const type = document.getElementById('transaction-type').value;
+      const amount = parseFloat(document.getElementById('transaction-amount').value);
+      const category = document.getElementById('transaction-category').value;
+      const description = document.getElementById('transaction-description').value || 'Sem descrição';
+      
+      if (!amount || amount <= 0) {
+        alert('Por favor, insira um valor válido.');
+        return;
+      }
+      
+      const today = new Date();
+      const date = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
+      
+      const transaction = {
+        date,
+        description,
+        category,
+        amount,
+        type
+      };
+      
+      // Adicionar ao histórico
+      financialData.transactions.unshift(transaction);
+      
+      // Atualizar valores financeiros
+      if (type === 'income') {
+        financialData.cash += amount;
+      } else {
+        financialData.totalSpending += amount;
+        if (category === 'credit') {
+          financialData.monthlyCredit += amount;
+          financialData.debts += amount;
+        } else {
+          financialData.cash -= amount;
+          financialData.dailySpending += amount;
+        }
+      }
+      
+      // Limpar formulário
+      document.getElementById('transaction-amount').value = '';
+      document.getElementById('transaction-description').value = '';
+      
+      updateUI();
+      initCharts(); // Atualizar gráficos
+    });
+    
+    // Criar um painel
+    function createPanel(key) {
+      const panel = document.createElement('div');
+      panel.className = 'panel';
+      panel.dataset.key = key;
+      
+      let title, value;
+      
+      switch(key) {
+        case 'dailySpending':
+          title = 'GASTO DIÁRIO';
+          value = formatCurrency(financialData.dailySpending);
+          break;
+        case 'monthlyCredit':
+          title = 'CARTÃO DE CRÉDITO';
+          value = formatCurrency(financialData.monthlyCredit);
+          break;
+        case 'totalSpending':
+          title = 'TOTAL GASTO';
+          value = formatCurrency(financialData.totalSpending);
+          break;
+        case 'currentBalance':
+          title = 'SALDO ATUAL';
+          const balance = financialData.cash - financialData.debts;
+          value = formatCurrency(balance);
+          break;
+      }
+      
+      panel.innerHTML = `
+        <h2 class="panel-header">
+          ${title}
+          <button class="delete-btn">✖</button>
+        </h2>
+        <div class="panel-value ${key === 'currentBalance' ? (balance >= 0 ? 'positive' : 'negative') : ''}">
+          ${value}
+        </div>
+      `;
+      
+      // Adicionar evento para excluir o painel
+      panel.querySelector('.delete-btn').addEventListener('click', function() {
+        panel.remove();
+      });
+      
+      return panel;
+    }
+    
+    // Adicionar painel
+    document.getElementById('add-panel').addEventListener('click', function() {
+      const panelType = document.getElementById('panel-type').value;
+      if (!panelType) return;
+      
+      const panel = createPanel(panelType);
+      document.getElementById('panels-container').appendChild(panel);
+    });
+    
+    // Alterar layout
+    document.getElementById('layout-select').addEventListener('change', function() {
+      const cols = this.value;
+      const container = document.getElementById('panels-container');
+      
+      container.className = `dashboard-grid grid-cols-${cols}`;
+    });
+    
+    // Inicialização
+    document.addEventListener('DOMContentLoaded', function() {
+      // Adicionar painéis padrão
+      const defaultPanels = ['currentBalance', 'dailySpending', 'totalSpending', 'monthlyCredit'];
+      const container = document.getElementById('panels-container');
+      
+      defaultPanels.forEach(panel => {
+        container.appendChild(createPanel(panel));
+      });
+      
+      // Inicializar gráficos
+      initCharts();
+      
+      // Atualizar UI
+      updateUI();
+    });
+  </script>
+</body>
+</html>
